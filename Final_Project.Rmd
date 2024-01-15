@@ -1,0 +1,394 @@
+---
+title: "Final Project"
+author: "William DeForest, Daniel Krasemann, Sam Chotzen"
+date: "12/16/2021"
+output: github_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.height = 6, fig.width = 7)
+```
+
+# Project Overview
+
+## Background:
+	
+Recidivism is a fundamental concept of criminal justice. It refers to a person's relapse into criminal behavior after the person has served their prison sentence. It is measured as criminal acts that resulted in rearrest, re-conviction, or return to prison with or without a new sentence during a three-year period following a person's release. Historically, recidivism rates have been very high, with several studies reporting that more than 60% of former prisoners recidivate within three years of being released. As a result, recidivism has become known as the “revolving door” in and out of prison. 
+It is closely related to and significantly affects other important criminal justice topics such as incapacitation, specific deterrence, rehabilitation, and desistance. Incapacitation refers to stopping people from committing a crime by removing them from the community. 
+Specific deterrence measures whether a sanction prevents people from committing further crime, once the sanction has been imposed or completed.
+
+Rehabilitation refers to the reduction of crime by “repairing” the individual in some way by addressing his or her needs or deficits.
+Desistance refers to the process by which a person arrives at a permanent state of non-offending
+Ultimately, a person released from prison will either recidivate or desist. Of course, the desired outcome is always desistance, so it is important to consider what the crucial factors are in determining whether an individual will recidivate or not. 
+
+The Bureau of Justice Statistics (BJS) has been collecting recidivism data since the early 1980s. This data has been used in the past by the National Institute of Justice (NJI) to inform its probation and parole policy. However, this practice is highly controversial because the use of recidivism as a criminal justice statistic is a double-edged sword. 
+
+On the one hand, analyzing trends in recidivism data can help identify which prisoners are the most likely to recidivate. This of course can be used to prevent more crimes from occurring. To this point, the main way the NJI has been utilizing this data is to be able to create a “supervision risk score” scale with which they can rank and identify the individuals with the highest risk of recidivating. 
+
+However, this is an issue because recidivism data is skewed by inconsistencies and biases in policing, charging, and supervision. Incarceration and recidivism most directly affect non-white and poor individuals, reflecting the “disproportionate minority contact” of the criminal justice system, and the link between poverty and criminal justice system involvement. Poor communities of color are affected by recidivism most acutely, since recidivism has a negative impact on economic mobility with financial consequences not only for the formerly incarcerated individual, but for their family and community as well. 
+
+As a result, in recent years there has been a shift in focus towards the creation of programs that promote desistance rather than prevent recidivism as well as towards improving law enforcement techniques and training to reduce the number of people who end up incarcerated in the first place. This is driven by research that shows that imprisonment has little positive effect on criminal activity other than for the period when the individual is incarcerated. Furthermore, it shows that imprisonment has disruptive effects on an individual’s life trajectory. This is because a perfect outcome of reintegration into society is often difficult to achieve for people leaving incarceration, as evidenced by the overwhelming prevalence of homelessness, unemployment, and poverty among formerly incarcerated people.
+
+## Project Objectives:
+
+With this project, we hope to contribute to the research on achieving desistance by identifying the characteristics that are most highly correlated with recidivism in order to create targeted programs to help incarcerated individuals have a smoother reentry into society. We will focus first on what factors are the best predictors of recidivism and then dive deeper into certain categories of characteristics to hopefully help craft specific recommendations for ways to promote desistance and lower recidivism. While we will look to create a model with the highest accuracy, precision, and recall, we will be more interested in the specific variables within the model. We will focus on accuracy measures and Gini coefficients primarily through a random forest predictive model when determining the best predictors of recidivism.
+
+
+## Data Used:
+
+We have data from the National Institute of Justice on roughly 26,000 individuals from the State of Georgia released from Georgia prisons on discretionary parole to the custody of the Georgia Department of Community Supervision (GDCS) for the purpose of post-incarceration supervision between January 1, 2013 and December 31, 2015. This data was previously used earlier this year as a part of the NIJ’s “Recidivism Challenge” which tasked teams of students and professionals to create predictive models with the hopes of increasing recidivism prediction accuracy. 
+
+```{r, include=FALSE}
+#load packages
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ROCR)
+library(rpart)
+library(partykit)
+library(boot)
+library(randomForest)
+library(class)
+library(tigris)
+library(tidyverse)
+```
+
+```{r, include=FALSE}
+#import National Institute of Justice data on recidivism for Georgia inmates between 2013 and end of 2015
+NJ <- read_csv("NIJ_s_Recidivism_Challenge_Full_Dataset.csv")
+NJ
+```
+
+```{r, include=FALSE}
+#remove NAs in order to be able to run our statistical analyses
+NJ <- na.exclude(NJ)
+```
+
+### Summary of Data
+
+To get a sense of the data, we looked at the raw number of Recidivism counts in the years 1, 2, 3, and total. In order to run our predictive models, we needed to remove all NA observations from the data set. Since there were not any columns that had a significant number of NA observations, removing all rows with NA observations was necessary. While this was not ideal, it still left us with 9,838 rows of data.
+
+```{r, echo=FALSE}
+#count the number of former inmates who recidivated in each year after their release
+NJ %>%
+  count(Recidivism_Arrest_Year1)
+```
+
+```{r, echo=FALSE}
+NJ %>%
+  count(Recidivism_Arrest_Year2)
+```
+
+```{r, echo=FALSE}
+NJ %>%
+  count(Recidivism_Arrest_Year3)
+```
+
+```{r, echo=FALSE}
+#total number of prisoners who recidivated during the 3 years after release
+NJ %>%
+  count(Recidivism_Within_3years)
+```
+As we can see, there were the most arrests in year 1, followed by year 2, and then year 3. Overall, there was recidivism for more than half of the prisoners within 3 years in the data set, as we can see by the number of TRUE observations in the `Recidivism_Within_3years` column. These initial findings related to the difficulty behind successful desistance and inspired our research to find the most accurate predictors for recidivism. We also observed that, as far as the predictive models go, if one were to predict that all cases of recidivism within 3 years were TRUE, the accuracy would be 59.44%.
+
+### Data Visualizations
+
+Before diving into any predictive analysis, we created a couple of graphs to offer visualizations of clear data points in our data set. To begin, we created a bar graph measuring the number of recidivism counts within 3 years that were divided by race and age. As we can see, there were more arrests of younger individuals, the majority of whom were minorities. Reaching the youth and minorities when dealing with former prisoners will be an essential aspect of preventing recidivism. The graph below was also interesting because it showed us that there were more minorities in the data set than white individuals.
+
+```{r, echo=FALSE}
+#the first plot we decided to make was a bar graph breaking down the data set by race and age at release. We used ggplot and its facet wrap function to split the dataset by people who recidivated versus those who didn't.
+NJ %>%
+  ggplot(mapping = aes(x = Race, fill = Age_at_Release)) +
+  geom_bar() +
+  facet_wrap(~Recidivism_Within_3years)
+```
+
+We also took a look at the effect of gang affiliation on recidivism rates. The visualization below shows us that having a gang affiliation does lead to higher rates of recidivism. Our predictive analysis further below showed how impactful the gang affiliation column truly was in predicting recidivism. Again, we also see that the younger ages were most prominent in the data set, since there were relatively few observations of individuals 48 or older.
+
+```{r, echo=FALSE}
+#this plot looks at the effect of gang affiliation on recidivism rates.
+NJ %>%
+  ggplot(mapping = aes(x = Gang_Affiliated, fill = Age_at_Release)) +
+  geom_bar() +
+  facet_wrap(~Recidivism_Within_3years)
+```
+
+### Logistic Model
+
+To begin our predictive analysis, we ran a basic logistic model to determine the accuracy, precision, and recall of the recidivism within 3 years. We chose the `Recidivism_Within_3years` column to base our prediction off of because it looked slightly into the future and considered all three years after being released from prison rather than just one year. Before running the model, we needed to clean and organize the data to ensure it ran smoothly. This process included removing NA values to ensure the proper number of observations. As mentioned above, removing the NA values decreased the number of rows in the data set, but it was necessary for the logistic model. We also removed two columns that included supervision data, because those columns were based on predictions that the researchers behind the data set made. If we were looking to make our own predictions, including previous predictions would only interfere with the objective analysis of our data. Another important element we had to complete before running the logistic model was removing any columns that only had 1 unique observation. Running the `sapply` command below showed us that the column `Gender` only had one unique observations. We blamed this on an error in the code since there were male and female observations. We removed the column to ensure our logistic model could run. The logistic model below contains all columns except for the ones mentioned above as well as the `ID` column. 
+
+Along with calculating the accuracy, precision, and recall, we also plotted a double density and ROC curve.
+
+```{r, include=FALSE}
+#there was an issue in the data with the gender variable only being read in as a single value rather than "Male" and "Female". This sapply function helped us identify it.
+sapply(lapply(NJ, unique), length)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#logit model using all the variables except for supervision risk variables
+default.glm <- glm(Recidivism_Within_3years ~ Race + Age_at_Release + Residence_PUMA + Gang_Affiliated + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, family = "binomial", data = NJ)
+summary(default.glm)
+
+#calc probabilities and accuracy
+NJ_glm <- NJ %>% mutate(probs = predict(default.glm, type="response"), prediction_default = ifelse(probs >= .5, "TRUE", "FALSE"))
+with(NJ_glm, table(Recidivism_Within_3years, prediction_default))
+
+stats_default_glm <- NJ_glm %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_default), precision = sum(Recidivism_Within_3years=="TRUE" & prediction_default == "TRUE")/sum(prediction_default=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_default == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+stats_default_glm
+
+#plot double density and ROC curves
+double_dens_default <- ggplot(NJ_glm, aes(x=probs, color=Recidivism_Within_3years)) + geom_density(size=1.5) + ggtitle("Forecasted Probabilities") + geom_vline(xintercept= .585)
+double_dens_default
+preds_default_obj <- prediction(NJ_glm$probs, NJ_glm$Recidivism_Within_3years, label.ordering=c("FALSE", "TRUE"))
+perf_default_obj <- performance(preds_default_obj, "tpr", "fpr")
+perf_default_df <- data_frame(fpr=unlist(perf_default_obj@x.values), tpr=unlist(perf_default_obj@y.values), threshold=unlist(perf_default_obj@alpha.values), model="default.glm")
+default_ROC <- ggplot(perf_default_df, aes(x=fpr, y=tpr, color=threshold)) + geom_line() + labs(x="false positive rate", y="true positive rate", title="ROC Curve for Default Logistic Regression") + geom_abline(slope=1, intercept=0, linetype=3) + scale_color_gradient2(midpoint=0.5, mid="black", low="orange", high="pink")
+default_ROC
+```
+
+The results of the logistic model were promising. The most important variable for us was the accuracy, which was 72.6%. The double density curves and ROC curve further demonstrated the accuracy of the model. The double density curves had some (but not a ton of) overlap, and the area under the ROC curve was well above 0.5.
+
+In terms of comparing accuracy to assess the strongest predictive model, more important to us than the logistic model was the K-fold cross validation method of assessing accuracy. This method considered over-fitting, which we needed in order to produce an accurate prediction and forecast of recidivism in our data set. The K-fold data below shows that the accuracy of the model using all of the variables was 71.9%, which was slightly lower than the logistic model alone.
+
+```{r, echo=FALSE, warning=FALSE}
+#Cross Validation K-fold
+set.seed(29)
+cost <- function(y, pi) 1-mean(y==(pi>.5))
+error <- cv.glm(NJ, default.glm, cost, 10)
+error$delta
+accuracy <- 1-error$delta
+accuracy
+```
+
+We next wanted to run a logistic model using the significant variables that were identified in the previous logistic model and other variables we believed would be important to include. We looked at the variables with the lowest significance codes, or the variables with the most stars (*) next to their name. We subjectively chose other variables (`Race`, `Program_Attendances`) that we were interested in exploring further.
+
+```{r, echo=FALSE}
+#Logistic model with specific variables
+default.glm <- glm(Recidivism_Within_3years ~ Race + Percent_Days_Employed + Jobs_Per_Year + Avg_Days_per_DrugTest + Program_Attendances + DrugTests_THC_Positive, family = "binomial", data = NJ)
+summary(default.glm)
+
+#calc probabilities and accuracy
+NJ_glm <- NJ %>% mutate(probs = predict(default.glm, type="response"), prediction_default = ifelse(probs >= .5, "TRUE", "FALSE"))
+with(NJ_glm, table(Recidivism_Within_3years, prediction_default))
+
+stats_default_glm <- NJ_glm %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_default), precision = sum(Recidivism_Within_3years=="TRUE" & prediction_default == "TRUE")/sum(prediction_default=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_default == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+stats_default_glm
+
+#plot double density and ROC curves
+double_dens_default <- ggplot(NJ_glm, aes(x=probs, color=Recidivism_Within_3years)) + geom_density(size=1.5) + ggtitle("Forecasted Probabilities")
+double_dens_default
+preds_default_obj <- prediction(NJ_glm$probs, NJ_glm$Recidivism_Within_3years, label.ordering=c("FALSE", "TRUE"))
+perf_default_obj <- performance(preds_default_obj, "tpr", "fpr")
+perf_default_df <- data_frame(fpr=unlist(perf_default_obj@x.values), tpr=unlist(perf_default_obj@y.values), threshold=unlist(perf_default_obj@alpha.values), model="default.glm")
+default_ROC <- ggplot(perf_default_df, aes(x=fpr, y=tpr, color=threshold)) + geom_line() + labs(x="false positive rate", y="true positive rate", title="ROC Curve for Default Logistic Regression") + geom_abline(slope=1, intercept=0, linetype=3) + scale_color_gradient2(midpoint=0.5, mid="black", low="orange", high="pink")
+default_ROC
+```
+
+Examining the results of the logistic model using more specific variables, we can determine which variables had positive or negative effects on the probability of recidivism. The variables with a negative coefficient, such as `Percent_Days_Employed`, `Avg._Days_per_DrugTest`, and `Program_Attendance`, of 10 or more decrease the probability of recidivism. These all make intuitive sense except possibly for the avg. days per drug test. We would expect that a former prisoner who got tested for drugs less frequently might be more likely to get away with using drugs. However, that does not appear to be the case. One theory might be that former prisoners who had no history of drug use would be tested less frequently and this distance from drugs could also contribute to them not being as likely to recidivate.
+
+While the logistic models were interesting and informative, especially due to the fact that we can tell the direction of the effect of each variable, we wanted to perform further analysis and try and get a more accurate prediction by using a random forest model.
+
+### Random Forest Model
+
+We anticipated that to produce the highest level of accuracy, we would need to use a random forest prediction model. This model would also provide analysis on which variables were the most significant in predicting recidivism, which we were interested in. To run the random forest model, we needed to convert the recidivism data to factors, which we did using the `as.factor` command. We used the same variables that we used for the logistic model, and found the accuracy to be 72.58%, which is slightly higher than the K-fold model.
+
+```{r, echo=FALSE}
+#Random Forest with all variables
+set.seed(29)
+rforest_all <- randomForest(as.factor(Recidivism_Within_3years) ~ Race + Age_at_Release + Residence_PUMA + Gang_Affiliated  + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, data = NJ, ntree=200, mtry=6)
+importance(rforest_all)
+varImpPlot(rforest_all)
+#make predictions
+train_rforest_all <- NJ %>% mutate(probs_rf = predict(rforest_all, type="prob")[,2], prediction_rf = predict(rforest_all, type="response"))
+
+train_rforest_all %>% select(Recidivism_Within_3years, probs_rf, prediction_rf) %>% head(10)
+#random forest performance measures
+rforest_all
+train_rforest_all  %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_rf), precision = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(prediction_rf=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+```
+
+Next, we chose specific variables from the random forest model to run a further model on. We decided to use the 10 most significant variables as measured by the mean decrease in Gini coefficient.
+
+```{r, echo=FALSE}
+#Random Forest with all variables
+set.seed(29)
+rforest_imp <- randomForest(as.factor(Recidivism_Within_3years) ~ Age_at_Release + Residence_PUMA + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_PPViolationCharges + Program_Attendances + Avg_Days_per_DrugTest + DrugTests_THC_Positive + Percent_Days_Employed + Jobs_Per_Year, data = NJ, ntree=200, mtry=3)
+importance(rforest_imp)
+varImpPlot(rforest_imp)
+#make predictions
+train_rforest_imp <- NJ %>% mutate(probs_rf = predict(rforest_imp, type="prob")[,2], prediction_rf = predict(rforest_imp, type="response"))
+
+#random forest performance measures
+rforest_imp
+train_rforest_imp  %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_rf), precision = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(prediction_rf=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+```
+
+Looking at the importance of the variables based on the mean decrease in Gini, we can see that the most significant variable, or the variable with the highest mean decrease in Gini, is the `Avg_Days_per_DrugTest`. Other significant variables include the `Jobs_Per_Year`, `Percent_Days_Employed`, and `Residence_PUMA`. This is interesting in comparison with the results from the logistic model. Both models identify similar variables as being particularly effective at predicting recidivism. The random forest model suggests that the Avg days per drug test variable is the most significant. In addition, it further supports the takeaway that the variables measured after release are the best for predicting recidivism. This is important because it tells us that it is difficult to predict recidivism before releasing someone. This does not support the NIJ's use of recidivism statistics to inform their parole and probation policies because those are decided before the prisoner is released. As a result, those decisions of parole and probation policies will likely be more heavily influenced by characteristics like race and where the prisoner's home was. These don't take into account the prisoner's actual personality.
+
+### Digging Deeper
+
+With the most important predictors identified, we decided to dig deeper into the data and see how the variables would change if we conditioned the dataset on certain characteristics.
+
+We decided to look at race first. There is an immediate issue and limitation with the race variable in the dataset in that it only categorizes prisoners as black or white. Of course there are a myriad of other races and many very prevalent in the United States. However, Census data does tell us that white (57.8%) and black (31.9%) constitute nearly 90% of Georgia's racial makeup. As such, we believe the variable is usable and can still provide insight.
+
+```{r, echo=FALSE}
+#A look at race in the data set
+NJ %>% group_by(Race) %>% summarize(N=n())
+```
+
+As we can see by the above breakdown, black people are disproportionately represented in the data. This points towards the pervasive and disturbing issue of minorities being incarcerated more than white people. To gain more insight into the characteristics of these two groups, we ran two separate random forest models - one conditioned on race being black and another with race being white.
+
+```{r}
+#create datasets conditioned on the prisoner being either black or white
+NJ_Black <- NJ %>% filter(Race =="BLACK") 
+NJ_White <- NJ %>% filter(Race == "WHITE")
+```
+
+```{r, echo=FALSE}
+#Random Forest with all variables conditioned on BLACK
+set.seed(29)
+rforest_Black <- randomForest(as.factor(Recidivism_Within_3years) ~ Age_at_Release + Residence_PUMA + Gang_Affiliated  + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, data = NJ_Black, ntree=200, mtry=5)
+importance(rforest_Black)
+
+#make predictions
+train_rforest_Black <- NJ_Black %>% mutate(probs_rf = predict(rforest_Black, type="prob")[,2], prediction_rf = predict(rforest_Black, type="response"))
+
+#random forest performance measures
+rforest_Black
+train_rforest_Black  %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_rf), precision = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(prediction_rf=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+```
+
+
+```{r, echo=FALSE}
+#Random Forest with all variables conditioned on WHITE
+set.seed(29)
+rforest_White <- randomForest(as.factor(Recidivism_Within_3years) ~ Age_at_Release + Residence_PUMA + Gang_Affiliated  + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, data = NJ_White, ntree=200, mtry=7)
+importance(rforest_White)
+
+#make predictions
+train_rforest_White <- NJ_White %>% mutate(probs_rf = predict(rforest_White, type="prob")[,2], prediction_rf = predict(rforest_White, type="response"))
+
+#random forest performance measures
+rforest_White
+train_rforest_White  %>% summarize(accuracy = mean(Recidivism_Within_3years==prediction_rf), precision = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(prediction_rf=="TRUE"), recall = sum(Recidivism_Within_3years == "TRUE" & prediction_rf == "TRUE")/sum(Recidivism_Within_3years == "TRUE"))
+```
+
+```{r}
+#Compare the plots of the mean decrease in Gini coefficients for both black and white prisoners
+varImpPlot(rforest_Black)
+varImpPlot(rforest_White)
+```
+
+Comparing the results from the random forest models, a few interesting similarities and differences jump out. First, regardless of race, it appears that `Percent_Days_Employed`, `Jobs_Per_Year`, and `Avg._Days_per_DrugTest` were the most significant predictors of recidivism. All three of these variables were measured after release during the period of parole supervision. It makes sense that these would be the best predictors of recidivism because they showcase how the former prisoner is acting now that they are out of jail. If they are employed fewer days, bouncing around jobs, and not being tested for drugs frequently, the chances that they get up to no good are much higher. We can confirm this intuition regarding the positive or negative affects an increase in these variables has on the probability of recidivism by running a logistic regression. 
+
+The signs on the coefficients of the percent_days_employed, jobs_per_year, and `Avg._Days_per_DrugTest` variables confirm our intuition on how they affect the probability of recidivism for both races.
+
+The next interesting takeaway is that the next most significant variable differs for the groups. For black prisoners, where they lived after release (residence_PUMA) was next most important and for white prisoners it was whether they had a prior arrest for violating probation or parole. These findings are extremely interesting because it seems to support the claim that the neighborhood/community one lives in has a large effect on the person's life and that black people come from neighborhoods that have higher rates of recidivism and crime than white people. This once again goes back to the severe racial inequality that is prevalent in the United States. Black communities and neighborhoods are historically less economically well-off as a result of past national policies such as redlining and this data suggests that this inequality extends to increasing the likelihood of ending up in jail and recidivating too.
+
+```{r}
+#logit models to be able to tell the direction of the effect that the important variables had on recidivism rates
+black.glm <- glm(Recidivism_Within_3years ~ Age_at_Release + Residence_PUMA + Gang_Affiliated  + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, family = "binomial", data = NJ_Black)
+summary(black.glm)
+
+white.glm <- glm(Recidivism_Within_3years ~ Age_at_Release + Residence_PUMA + Gang_Affiliated  + Education_Level + Dependents + Prison_Offense + Prison_Years + Prior_Arrest_Episodes_Felony + Prior_Arrest_Episodes_Misd + Prior_Arrest_Episodes_Violent + Prior_Arrest_Episodes_Property + Prior_Arrest_Episodes_Drug + Prior_Arrest_Episodes_PPViolationCharges + Prior_Arrest_Episodes_DVCharges + Prior_Arrest_Episodes_GunCharges + Prior_Conviction_Episodes_Felony + Prior_Conviction_Episodes_Misd + Prior_Conviction_Episodes_Viol + Prior_Conviction_Episodes_Prop + Prior_Conviction_Episodes_Drug + Prior_Conviction_Episodes_PPViolationCharges + Prior_Conviction_Episodes_DomesticViolenceCharges + Prior_Conviction_Episodes_GunCharges + Prior_Revocations_Parole + Prior_Revocations_Probation + Condition_MH_SA + Condition_Cog_Ed + Condition_Other + Violations_ElectronicMonitoring + Violations_Instruction + Violations_FailToReport + Violations_MoveWithoutPermission + Delinquency_Reports + Program_Attendances + Program_UnexcusedAbsences + Residence_Changes + Avg_Days_per_DrugTest + DrugTests_THC_Positive + DrugTests_Cocaine_Positive + DrugTests_Meth_Positive + DrugTests_Other_Positive + Percent_Days_Employed + Jobs_Per_Year + Employment_Exempt, family = "binomial", data = NJ_White)
+summary(white.glm)
+```
+
+This interesting result that geographic location plays an important role in determining whether a prisoner recidivates or not motivated us to create a visual mapping the proportion of individuals from each geographic area who recidivated.
+
+### Mapping Recidivism in Georgia
+
+```{r, echo=FALSE}
+#create the % recidivated datapoint for each PUMA cluster in the data
+geo_recidivism <- NJ %>% group_by(Residence_PUMA) %>% summarize(n=n(), prop=sum(Recidivism_Within_3years)/n)
+
+geo_recidivism_black <- NJ_Black %>% group_by(Residence_PUMA) %>% summarize(n=n(), prop=sum(Recidivism_Within_3years)/n)
+
+geo_recidivism_white <- NJ_White %>% group_by(Residence_PUMA) %>% summarize(n=n(), prop=sum(Recidivism_Within_3years)/n)
+
+```
+
+```{r, echo=FALSE}
+#import PUMA data
+georgia_puma <- map("GA", tigris::pumas, class = "sf", cb = TRUE) %>% 
+  reduce(rbind)
+
+#create new columns with the % recidivism rates for each PUMA cluster as calculated above. We had to hardcode these because the dataset condensed the 72 total PUMAs in Georgia into just 25 clusters. We could not figure out a way to assign those clusters to the list of individual PUMAs, so we hardcoded a new column. Not ideal, but we were really determined to create the map visualizations. See the link to appendix 3 below which has the breakdown of the condensed PUMA clusters.
+georgia_puma$geo_recidivism <- as.numeric(c("0.5792564", "0.5796519", "0.6279070", "0.5612903", "0.5041899", "0.5897436", "0.6145455", "0.5792564", "0.6145455", "0.6738661", "0.5792564", "0.5901408", "0.5637584", "0.6279070", "0.5107914", "0.5932203", "0.6279070", "0.6289062", "0.5612903", "0.6079404", "0.5041899", "0.5107914", "0.6145455", "0.5901408", "0.6177474", "0.6073211", "0.5041899", "0.6289062", "0.6073211", "0.5897436", "0.5777778", "0.6816976", "0.5932203", "0.5250896", "0.6073211", "0.6343693", "0.6079404", "0.6279070", "0.6200466", "0.5625990", "0.6263736", "0.5637584", "0.5637584", "0.6816976", "0.5625990", "0.6738661", "0.5796519", "0.5777778", "0.5723140", "0.6738661", "0.6263736", "0.5250896", "0.6177474", "0.6289062", "0.6145455", "0.5637584", "0.6200466", "0.6200466", "0.5637584", "0.5723140", "0.6343693", "0.6177474", "0.5637584", "0.5625990", "0.5637584", "0.6079404", "0.5971731", "0.5932203", "0.6200466", "0.5971731", "0.5625990", "0.6263736"))
+
+#recidivism rates for black former prisoners
+georgia_puma$geo_recidivism_black <- as.numeric(c("0.6097561", "0.5873016", "0.6581921", "0.5714286", "0.5207921", "0.6096033", "0.6915888", "0.6097561", "0.6915888", "0.7290640", "0.6097561", "0.5839599", "0.5485232", "0.6581921", "0.4000000", "0.5919056", "0.6581921", "0.6405694", "0.5714286", "0.5862069", "0.5207921", "0.4000000", "0.6915888", "0.5839599", "0.6320346", "0.5853659", "0.5207921", "0.6405694", "0.5853659", "0.6096033", "0.5737705", "0.6851211", "0.5919056", "0.5323383", "0.5853659", "0.6518771", "0.5862069", "0.6581921", "0.6307692", "0.5716846", "0.6261860", "0.5485232", "0.5485232", "0.6851211", "0.5716846", "0.7290640", "0.5873016", "0.5737705", "0.5867052", "0.7290640", "0.6261860", "0.5323383", "0.6320346", "0.6405694", "0.6915888", "0.5485232", "0.6307692", "0.6307692", "0.5485232", "0.5867052", "0.6518771", "0.6320346", "0.5485232", "0.5716846", "0.5485232", "0.5862069", "0.6477273", "0.5919056", "0.6307692", "0.6477273", "0.5716846", "0.6261860"))
+
+#recidivism rates for white former prisoners
+georgia_puma$geo_recidivism_white <- as.numeric(c("0.5245902", "0.5555556", "0.5994695", "0.5594937", "0.4644550", "0.5241379", "0.6030641", "0.5245902", "0.6030641", "0.6307692", "0.5245902", "0.5980707", "0.5738162", "0.5994695", "0.5294118", "0.5954416", "0.5994695", "0.5970874", "0.5594937", "0.6478873", "0.4644550", "0.5294118", "0.6030641", "0.5980707", "0.5645161", "0.6336996", "0.4644550", "0.5970874", "0.6336996", "0.5241379", "0.5900000", "0.6704545", "0.5954416", "0.5064103", "0.6336996", "0.6141732", "0.6478873", "0.5994695", "0.6035503", "0.4931507", "0.6272727", "0.5738162", "0.5738162", "0.6704545", "0.4931507", "0.6307692", "0.5555556", "0.5900000", "0.5362319", "0.6307692", "0.6272727", "0.5064103", "0.5645161", "0.5970874", "0.6030641", "0.5738162", "0.6035503", "0.6035503", "0.5738162", "0.5362319", "0.6141732", "0.5645161", "0.5738162", "0.4931507", "0.5738162", "0.6478873", "0.5743590", "0.5954416", "0.6035503", "0.5743590", "0.4931507", "0.6272727"))
+
+```
+
+```{r, echo=FALSE}
+#all prisoners % recidivism by PUMA
+georgia_puma %>%
+  ggplot(aes(fill = geo_recidivism)) +
+  geom_sf() +
+  scale_fill_distiller(palette="Spectral",
+    labels = scales::label_percent(1)
+    ) +
+  labs(title = "Percentage of all prisoners who recidivated") +
+  theme_void()
+
+#black % recidivism by PUMA
+georgia_puma %>%
+  ggplot(aes(fill = geo_recidivism_black)) +
+  geom_sf() +
+ scale_fill_distiller(palette="Spectral",
+    labels = scales::label_percent(1)
+    ) +
+  labs(title = "Percentage of black prisoners who recidivated") +
+  theme_void()
+
+#white % recidivism by PUMA
+georgia_puma %>%
+  ggplot(aes(fill = geo_recidivism_white)) +
+  geom_sf() +
+  scale_fill_distiller(palette="Spectral",
+    labels = scales::label_percent(1)
+    ) +
+  labs(title = "Percentage of white prisoners who recidivated") +
+  theme_void()
+```
+
+These graphs show the percentage of all, black, and white prisoners from clusters of PUMAs (public use microdata areas) in Georgia who recidivated. The graphs paint a very interesting story. First, we saw that there was a much wider range of recidivism rates for black prisoners depending on where they lived after release. There was a small area in the northwest part of the state where recidivism rates were 40%, while in the northeast, rates reached as high as 72%. This was significantly larger than the range of rates when looking at all and white prisoners who respectively ranged from 50%-68% and 46%-67%. This wider range likely explains why the Residence_PUMA variable was more significant for black prisoners. We could also see from the graphs that recidivism rates overall were higher for black prisoners than white prisoners.
+
+Next, looking at the specific PUMA clusters, we could see that for the most part the areas with high recidivism rates were consistent for both black and white prisoners. The main difference being that the rates of recidivism for black prisoners are pretty much higher across the board. With little familiarity with counties in Georgia, we were curious to compare these graphs with a regular map of Georgia.
+
+![Alt text](Final_Project_files/figure-gfm/Georgia-Map.jpg) ![Alt text](Final_Project_files/figure-gfm/Georgia_Median_Income.png)
+
+From these maps we could see that the area around Athens, Georgia had the highest rates of recidivism while Augusta, Georgia had the lowest rates. Looking at the median household income of the different areas in 2014, it's interesting that there didn't really appear to be a huge connection between lower income and higher recidivism. What was even more notable is that Athens is about 63% white and 28% black, while Augusta is 57% black and 36% white (worldpopulationreview.com). These findings suggest that black prisoners are more successful at desisting when living among a community with a higher black population. It also shows that black prisoners had a harder time desisting when living in an area like Athens that had a higher white population. The reasons for these findings could be numerous and much more research needs to be done in this area to confirm and build upon these findings. However, one potential hypothesis could be that black people living in an area with a higher white population might stick out more and be subject to more racial biases and as a result be more prone to being re-arrested.
+
+### Conclusion
+
+Our project shed light on the important variables in predicting recidivism. Although the accuracy of none of models were impressively high, the closer analysis of the significant variables can be useful to promote higher rates of desistance. We went into the project with the ambition of describing potential programs or areas worth investing man power or capital in to lower rates of recidivism. We came away with the prominent findings that employment, drug use, and geographic location are among the most significant variables in predicting recidivism. Rather than use a predictive model such as the one we created to closely monitor individuals with higher chances of recidivism, states and counties ought to consider the key variables we found when predicting recidivism in order to promote desistance. For employment, perhaps individuals newly-released from prison should receive some sort of capital or social job opportunity. For drug use, individuals should be placed in rehab programs and supported in their battle with drugs. Considering the incarceration system holistically, we found distinctions between white and black prisoners. Racial equality will continue to remain an important ambition of states and societies, and that especially applies to prisons. For geographic location, perhaps the state can work toward equality of opportunity across communities. Working with, rather than against, newly-released prisoners can facilitate a positive feedback loop. Promoting the good rather than preparing for the bad is the solution to lower recidivism rates. 
+
+
+
+## Works Cited
+
+“The Problem: Recidivism & Mass Incarceration.” Prison Scholar Fund, 20 July 2019, https://www.prisonscholars.org/what-we-do/222-2/.
+
+“Recidivism.” National Institute of Justice, U.S. Department of Justice, 31 July 2019, https://nij.ojp.gov/topics/corrections/recidivism.
+
+Wildeman, Christopher. “The Impact of Incarceration on the Desistance Process among Individuals Who Chronically Engage in Criminal Activity.” National Institute of Justice, 14 Oct. 2021, https://nij.ojp.gov/topics/articles/impact-incarceration-desistance-process-among-individuals-who-chronically-engage. 
+
+https://en.wikipedia.org/wiki/Demographics_of_Georgia_(U.S._state)
+
+https://worldpopulationreview.com/us-cities/athens-ga-population
+
+https://worldpopulationreview.com/us-cities/augusta-ga-population
+
+### Link to data
+
+https://data.ojp.usdoj.gov/stories/s/daxx-hznc
+
+Appendices: https://nij.ojp.gov/funding/recidivism-forecasting-challenge#appendices
+Appendix 2 was used to understand the variables and Appendix 3 was used to create the map visualizations
+
+
