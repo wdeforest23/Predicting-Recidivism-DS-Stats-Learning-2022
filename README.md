@@ -20,7 +20,9 @@ Final Project PDF - PDF of our final report with all visuals and explanations.
 
 ### **Mapping Recidivism**
 
+![Percentage of All Prisoners Who Recidivated](/unnamed-chunk-24-1.png)
 
+<img src="/unnamed-chunk-24-1.png" width="100" height="100">
 
 ### **Summary of Findings**
 
