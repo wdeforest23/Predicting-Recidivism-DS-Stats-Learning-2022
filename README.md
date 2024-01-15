@@ -20,13 +20,13 @@ Final Project PDF - PDF of our final report with all visuals and explanations.
 
 ### **Mapping Recidivism**
 
-<img src="/unnamed-chunk-24-1.png" alt="First Image" width="325"/> <img src="/unnamed-chunk-24-2.png" alt="Second Image" width="325"/> <img src="/unnamed-chunk-24-3.png" alt="Second Image" width="325"/>
+<img src="/unnamed-chunk-24-1.png" alt="First Image" width="300"/> <img src="/unnamed-chunk-24-2.png" alt="Second Image" width="300"/> <img src="/unnamed-chunk-24-3.png" alt="Second Image" width="300"/>
 
 These graphs show the percentage of all, black, and white prisoners from clusters of PUMAs (public use microdata areas) in Georgia who recidivated. The graphs paint a very interesting story. First, we saw that there was a much wider range of recidivism rates for black prisoners depending on where they lived after release. There was a small area in the northwest part of the state where recidivism rates were 40%, while in the northeast, rates reached as high as 72%. This was significantly larger than the range of rates when looking at all and white prisoners who respectively ranged from 50%-68% and 46%-67%. This wider range likely explains why the Residence_PUMA variable was more significant for black prisoners. We could also see from the graphs that recidivism rates overall were higher for black prisoners than white prisoners.
 
 Next, looking at the specific PUMA clusters, we could see that for the most part the areas with high recidivism rates were consistent for both black and white prisoners. The main difference being that the rates of recidivism for black prisoners are pretty much higher across the board. With little familiarity with counties in Georgia, we were curious to compare these graphs with a regular map of Georgia.
 
-<img src="/Georgia-Map.jpg" alt="First Image" width="450"/> <img src="Georgia_Median_Income.png" alt="Second Image" width="450"/>
+<img src="/Georgia-Map.jpg" alt="First Image" width="400"/> <img src="Georgia_Median_Income.png" alt="Second Image" width="400"/>
 
 From these maps we could see that the area around Athens, Georgia had the highest rates of recidivism while Augusta, Georgia had the lowest rates. Looking at the median household income of the different areas in 2014, it's interesting that there didn't really appear to be a huge connection between lower income and higher recidivism. What was even more notable is that Athens is about 63% white and 28% black, while Augusta is 57% black and 36% white (worldpopulationreview.com). These findings suggest that black prisoners are more successful at desisting when living among a community with a higher black population. It also shows that black prisoners had a harder time desisting when living in an area like Athens that had a higher white population. The reasons for these findings could be numerous and much more research needs to be done in this area to confirm and build upon these findings. However, one potential hypothesis could be that black people living in an area with a higher white population might stick out more and be subject to more racial biases and as a result be more prone to being re-arrested.
 
