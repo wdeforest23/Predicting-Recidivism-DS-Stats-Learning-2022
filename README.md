@@ -1,9 +1,8 @@
 # Data Science for Statistical Learning Final Project: **Predicting Recidivism Rates Using Logistic Regression and Random Forest Models**
 
 **Team Members:**
-Daniel Krasemann, Sam Chotzen, and William DeForest
 
-The following are the list of files used in this project as well as the files uploaded on this GitHub repository.
+Daniel Krasemann, Sam Chotzen, and William DeForest
 
 **Data**
 
@@ -13,8 +12,8 @@ NIJ_s_Recidivism_Challenge_Full_Dataset - From the National Institute of Justice
 
 Final_Project.Rmd - Contains the commented code used to make our project. 
 
-Final_Project.Md - Contains our final project output with only results and all code silenced
+Final_Project.Md - Contains our final project output with only results and all code silenced.
 
 **Final Report**
 
-Final Project PDF
+Final Project PDF - PDF of our final report with all visuals and explanations.
